@@ -1,0 +1,8 @@
+{
+    "domain": "noise_music_system",
+    "name": "Noise Music System",
+    "dependencies": ["mqtt"],
+    "integration_type": "device",
+    "version": "0.1.0",
+    "iot_class": "assumed_state"
+}
