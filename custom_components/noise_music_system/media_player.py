@@ -18,16 +18,20 @@ from homeassistant.components.media_player.const import (
     SUPPORT_VOLUME_STEP,)
 
 import homeassistant.helpers.config_validation as cv
-from homeassistant.components.media_player import ( PLATFORM_SCHEMA, MediaPlayerEntity, MediaPlayerDeviceClass, RepeatMode )
+from homeassistant.components.media_player import (
+    PLATFORM_SCHEMA,
+    MediaPlayerEntity,
+    MediaPlayerDeviceClass,
+    RepeatMode,
+    MediaPlayerState,
+    MediaType
+)
 from homeassistant.const import (
     ATTR_DEVICE_ID,
     ATTR_COMMAND,
     ATTR_ID,
     CONF_DEVICE_ID,
-    CONF_NAME,
-    STATE_OFF,
-    STATE_PAUSED,
-    STATE_PLAYING,
+    CONF_NAME
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.components import mqtt
@@ -44,12 +48,42 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 })
 
 SUPPORT_FEATURES = (
-    SUPPORT_PAUSE
-    | SUPPORT_VOLUME_STEP
-    | SUPPORT_PREVIOUS_TRACK
-    | SUPPORT_VOLUME_SET
-    | SUPPORT_NEXT_TRACK
-    | SUPPORT_PLAY
+    MediaPlayerEntityFeature.NEXT_TRACK
+    | MediaPlayerEntityFeature.PAUSE
+    | MediaPlayerEntityFeature.PLAY
+    | MediaPlayerEntityFeature.PREVIOUS_TRACK
+    | MediaPlayerEntityFeature.SEEK
+    | MediaPlayerEntityFeature.STOP
+    | MediaPlayerEntityFeature.VOLUME_MUTE
+    | MediaPlayerEntityFeature.VOLUME_SET
+)
+
+SUBSCRIBE_TOPIC = "noisemusicsystem/#"
+
+ATTR_ARTIST = 'artist'
+ATTR_ALBUM = 'album'
+ATTR_TRACKNAME = 'trackname'
+ATTR_TRACK_NUMBER = 'tracknumber'
+ATTR_DURATION = 'duration'
+ATTR_POSITION = 'position'
+ATTR_VOLUME = 'volume'
+
+STATUS_PAYLOAD = vol.Schema(
+    vol.All(
+        json_loads,
+        vol.Schema(
+            {
+                vol.Optional(ATTR_ARTIST): cv.string,
+                vol.Optional(ATTR_ALBUM): cv.string,
+                vol.Optional(ATTR_TRACKNAME): cv.string,
+                vol.Optional(ATTR_TRACK_NUMBER): cv.positive_int,
+                vol.Optional(ATTR_DURATION): cv.positive_int,
+                vol.Optional(ATTR_POSITION): cv.positive_int,
+                vol.Optional(ATTR_VOLUME): cv.positive_float
+            },
+            extra=vol.ALLOW_EXTRA,
+        ),
+    )
 )
 
 def _slugify_upper(string: str) -> str:
@@ -86,16 +120,16 @@ class NoiseMusicSystem(MediaPlayerEntity):
         self._name = device[CONF_NAME]
         self._device_id = _slugify_upper(device[CONF_DEVICE_ID])
         self._attr_unique_id = "unique_id"
-        self._attr_available = False
-        self._subscribe_topic = "noisemusicsystem/#"
 
-        self._volume = 70
-        self._track_name = "Tumbling Dice"
-        self._attr_media_album_artist = "The Rolling Stones"
-        self._track_artist = "The Rolling Stones"
-        self._track_album_name = "Sticky Fingers"
-        self._state = STATE_PLAYING
+        self._attr_media_album_artist = ""
+        self._track_artist = ""
+        self._track_album_name = ""
+        self._track_name = ""
         self._album_art = None
+        self._volume = 0.0
+        self._attr_state = MediaPlayerState.PAUSED
+        self._attr_media_content_type = MediaType.MUSIC
+        self._attr_available = True
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to MQTT events."""
@@ -105,14 +139,27 @@ class NoiseMusicSystem(MediaPlayerEntity):
             self._attr_available = payload == "online"
             self.schedule_update_ha_state(True)
 
-        def update_config(payload: str) -> None:
-            """Update device configuration"""
-
         def update_state(payload: str) -> None:
             """Update device state"""
+            try:
+                data = STATUS_PAYLOAD(payload)
+            except vol.MultipleInvalid as error:
+                _LOGGER.debug("Skipping update because of malformatted data: %s", error)
+                return
 
-        def device_command(payload: str) -> None:
-            """Perform device command"""
+            self._track_artist = data.get(ATTR_ARTIST)
+            self._attr_media_album_artist = data.get(ATTR_ARTIST)
+            self._track_album_name = data.get(ATTR_ALBUM)
+            self._track_name = data.get(ATTR_TRACKNAME)
+            self._attr_media_track = data.get(ATTR_TRACK_NUMBER)
+            self._attr_media_duration = data.get(ATTR_DURATION)
+            self._attr_media_position = data.get(ATTR_POSITION)
+            self._volume = data.get(ATTR_VOLUME)
+            self._attr_is_volume_muted = self._volume == 0
+            self._attr_available = True
+            self._attr_state = MediaPlayerState.PLAYING
+
+            self.schedule_update_ha_state(True)
 
         @callback
         def message_received(msg):
@@ -126,18 +173,14 @@ class NoiseMusicSystem(MediaPlayerEntity):
                     match command:
                         case 'availability':
                             update_availability(data)
-                        case 'config':
-                            update_config(data)
                         case 'state':
                             update_state(data)
-                        case 'command':
-                            device_command(data)
 
             except vol.MultipleInvalid as error:
                 _LOGGER.debug("Skipping update because of malformatted data: %s", error)
                 return
 
-        await mqtt.async_subscribe(self.hass, self._subscribe_topic, message_received, 1)
+        await mqtt.async_subscribe(self.hass, SUBSCRIBE_TOPIC, message_received, 1)
 
     # Exposed properties
     @property
@@ -145,109 +188,41 @@ class NoiseMusicSystem(MediaPlayerEntity):
         return MediaPlayerDeviceClass.RECEIVER
 
     @property
-    def name(self) -> str:
-        return self._name
-
-    @property
     def should_poll(self) -> bool:
         return False
-
-    @property
-    def state(self) -> str:
-        return self._state
 
     @property
     def supported_features(self) -> MediaPlayerEntityFeature:
         return SUPPORT_FEATURES
 
-    @property
-    def media_content_type(self):
-        """Content type of current playing media."""
-        return MEDIA_TYPE_MUSIC
-
-    @property
-    def media_duration(self) -> int | None:
-        """Duration of current playing media in seconds."""
-        return self._attr_media_duration
-
-    @property
-    def media_position(self) -> int | None:
-        """Position of current playing media in seconds."""
-        return self._attr_media_position
-
-    @property
-    def media_position_updated_at(self) -> dt.datetime | None:
-        """When was the position of the current playing media valid."""
-        return self._attr_media_position_updated_at
-
-    @property
-    def media_title(self):
-        """Title of current playing media."""
-        return self._track_name
-
-    @property
-    def media_artist(self):
-        """Artist of current playing media, music track only."""
-        return self._track_artist
-
-    @property
-    def media_album_name(self):
-        """Album name of current playing media, music track only."""
-        return self._track_album_name
-
-    @property
-    def media_album_artist(self) -> str | None:
-        """Album artist of current playing media, music track only."""
-        return self._attr_media_album_artist
-
-    @property
-    def media_track(self) -> int | None:
-        """Track number of current playing media, music track only."""
-        return self._attr_media_track
-
-    @property
-    def source(self) -> str | None:
-        """Name of the current input source."""
-        return self._attr_source
-
-    @property
-    def volume_level(self):
-        """Volume level of the media player (0..1)."""
-        return self._volume / 100.0
-
-    @property
-    def is_volume_muted(self) -> bool | None:
-        """Boolean if volume is currently muted."""
-        return self._attr_is_volume_muted
-
     # Commands
     async def async_media_play(self) -> None:
         """Send play command."""
-        await self.hass.async_add_executor_job(self.media_play)
+        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/play")
 
     async def async_media_pause(self) -> None:
         """Send pause command."""
-        await self.hass.async_add_executor_job(self.media_pause)
+        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/pause")
 
     async def async_media_stop(self) -> None:
         """Send stop command."""
-        await self.hass.async_add_executor_job(self.media_stop)
+        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/stop")
 
     async def async_media_previous_track(self) -> None:
         """Send previous track command."""
-        await self.hass.async_add_executor_job(self.media_previous_track)
+        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/previous")
 
     async def async_media_next_track(self) -> None:
         """Send next track command."""
-        await self.hass.async_add_executor_job(self.media_next_track)
+        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/next")
 
     async def async_media_seek(self, position: float) -> None:
         """Send seek command."""
-        await self.hass.async_add_executor_job(self.media_seek, position)
+        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/seek", position)
 
     async def async_set_repeat(self, repeat: RepeatMode) -> None:
         """Set repeat mode."""
-        await self.hass.async_add_executor_job(self.set_repeat, repeat)
+        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/repeat")
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Set volume level, range 0..1."""
@@ -255,11 +230,7 @@ class NoiseMusicSystem(MediaPlayerEntity):
 
     async def async_mute_volume(self, mute: bool) -> None:
         """Mute the volume."""
-        await self.hass.async_add_executor_job(self.mute_volume, mute)
-
-
-    def update(self) -> None:
-        return
+        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/volume", 0)
 
 
 def _parse_topic(topic: str) -> dict[str, Any]:
