@@ -67,6 +67,9 @@ ATTR_TRACK_NUMBER = 'tracknumber'
 ATTR_DURATION = 'duration'
 ATTR_POSITION = 'position'
 ATTR_VOLUME = 'volume'
+ATTR_PLAY_STATE = 'state'
+
+PLAY_STATE_PLAYING = 'playing'
 
 STATUS_PAYLOAD = vol.Schema(
     vol.All(
@@ -79,7 +82,8 @@ STATUS_PAYLOAD = vol.Schema(
                 vol.Optional(ATTR_TRACK_NUMBER): cv.positive_int,
                 vol.Optional(ATTR_DURATION): cv.positive_int,
                 vol.Optional(ATTR_POSITION): cv.positive_int,
-                vol.Optional(ATTR_VOLUME): cv.positive_float
+                vol.Optional(ATTR_VOLUME): cv.positive_float,
+                vol.Optional(ATTR_PLAY_STATE): cv.string
             },
             extra=vol.ALLOW_EXTRA,
         ),
@@ -128,7 +132,6 @@ class NoiseMusicSystem(MediaPlayerEntity):
         self._album_art = None
         self._volume = 0.0
         self._attr_state = MediaPlayerState.PAUSED
-        self._attr_media_content_type = MediaType.MUSIC
         self._attr_available = True
 
     async def async_added_to_hass(self) -> None:
@@ -154,10 +157,11 @@ class NoiseMusicSystem(MediaPlayerEntity):
             self._attr_media_track = data.get(ATTR_TRACK_NUMBER)
             self._attr_media_duration = data.get(ATTR_DURATION)
             self._attr_media_position = data.get(ATTR_POSITION)
+            self._attr_media_position_updated_at = dt_util.dt.datetime.utcnow()
             self._volume = data.get(ATTR_VOLUME)
             self._attr_is_volume_muted = self._volume == 0
             self._attr_available = True
-            self._attr_state = MediaPlayerState.PLAYING
+            self._attr_state = MediaPlayerState.PLAYING if data.get(ATTR_PLAY_STATE) == PLAY_STATE_PLAYING else MediaPlayerState.PAUSED
 
             self.schedule_update_ha_state(True)
 
@@ -188,12 +192,68 @@ class NoiseMusicSystem(MediaPlayerEntity):
         return MediaPlayerDeviceClass.RECEIVER
 
     @property
+    def media_content_type(self) -> MediaType | str | None:
+        """Content type of current playing media."""
+        return MediaType.MUSIC
+
+    @property
     def should_poll(self) -> bool:
         return False
 
     @property
     def supported_features(self) -> MediaPlayerEntityFeature:
         return SUPPORT_FEATURES
+
+
+    @property
+    def media_title(self) -> str:
+        """Title of current playing media."""
+        return self._track_name
+
+    @property
+    def media_track(self) -> int | None:
+        """Track number of current playing media, music track only."""
+        return self._attr_media_track
+
+    @property
+    def media_artist(self) -> str:
+        """Artist of current playing media, music track only."""
+        return self._track_artist
+
+    @property
+    def media_album_artist(self) -> str | None:
+        """Album artist of current playing media, music track only."""
+        return self._attr_media_album_artist
+
+    @property
+    def media_album_name(self) -> str:
+        """Album name of current playing media, music track only."""
+        return self._track_album_name
+
+    @property
+    def media_duration(self) -> int | None:
+        """Duration of current playing media in seconds."""
+        return self._attr_media_duration
+
+    @property
+    def media_position(self) -> int | None:
+        """Position of current playing media in seconds."""
+        return self._attr_media_position
+
+    @property
+    def media_position_updated_at(self) -> dt.datetime | None:
+        """When was the position of the current playing media valid."""
+        return self._attr_media_position_updated_at
+
+    @property
+    def volume_level(self) -> float:
+        """Volume level of the media player (0..1)."""
+        return self._volume
+
+    @property
+    def is_volume_muted(self) -> bool | None:
+        """Boolean if volume is currently muted."""
+        return self._attr_is_volume_muted
 
     # Commands
     async def async_media_play(self) -> None:
