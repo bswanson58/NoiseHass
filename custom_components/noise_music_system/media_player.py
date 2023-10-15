@@ -66,8 +66,9 @@ ATTR_TRACKNAME = 'trackname'
 ATTR_TRACK_NUMBER = 'tracknumber'
 ATTR_DURATION = 'duration'
 ATTR_POSITION = 'position'
+ATTR_POSITION_AT = 'positionat'
 ATTR_VOLUME = 'volume'
-ATTR_PLAY_STATE = 'state'
+ATTR_PLAY_STATE = 'playstate'
 
 PLAY_STATE_PLAYING = 'playing'
 
@@ -82,6 +83,7 @@ STATUS_PAYLOAD = vol.Schema(
                 vol.Optional(ATTR_TRACK_NUMBER): cv.positive_int,
                 vol.Optional(ATTR_DURATION): cv.positive_int,
                 vol.Optional(ATTR_POSITION): cv.positive_int,
+                vol.Optional(ATTR_POSITION_AT): cv.string,
                 vol.Optional(ATTR_VOLUME): cv.positive_float,
                 vol.Optional(ATTR_PLAY_STATE): cv.string
             },
@@ -157,8 +159,8 @@ class NoiseMusicSystem(MediaPlayerEntity):
             self._attr_media_track = data.get(ATTR_TRACK_NUMBER)
             self._attr_media_duration = data.get(ATTR_DURATION)
             self._attr_media_position = data.get(ATTR_POSITION)
-            self._attr_media_position_updated_at = dt_util.dt.datetime.utcnow()
-            self._volume = data.get(ATTR_VOLUME)
+            self._attr_media_position_updated_at = dt.datetime.strptime(data.get(ATTR_POSITION_AT), '%a, %d %b %Y %H:%M:%S GMT') #RFC 1123 format
+            self._volume = data.get(ATTR_VOLUME) / 100.0
             self._attr_is_volume_muted = self._volume == 0
             self._attr_available = True
             self._attr_state = MediaPlayerState.PLAYING if data.get(ATTR_PLAY_STATE) == PLAY_STATE_PLAYING else MediaPlayerState.PAUSED
@@ -177,7 +179,7 @@ class NoiseMusicSystem(MediaPlayerEntity):
                     match command:
                         case 'availability':
                             update_availability(data)
-                        case 'state':
+                        case 'status':
                             update_state(data)
 
             except vol.MultipleInvalid as error:
@@ -270,7 +272,7 @@ class NoiseMusicSystem(MediaPlayerEntity):
 
     async def async_media_previous_track(self) -> None:
         """Send previous track command."""
-        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/previous")
+        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/previous", "previous")
 
     async def async_media_next_track(self) -> None:
         """Send next track command."""
