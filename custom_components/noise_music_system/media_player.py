@@ -5,6 +5,7 @@ import datetime as dt
 from pprint import pformat
 import voluptuous as vol
 import logging
+import json
 from typing import Any
 
 from homeassistant.components.media_player.const import (
@@ -92,6 +93,12 @@ STATUS_PAYLOAD = vol.Schema(
     )
 )
 
+class command_payload:
+    def __init__(self, command: str, parameter: str = '') -> None:
+        self.command: str = command
+        self.parameter: str = parameter
+
+
 def _slugify_upper(string: str) -> str:
     """Return a slugified version of string, uppercased."""
     return slugify(string).upper()
@@ -124,6 +131,7 @@ class NoiseMusicSystem(MediaPlayerEntity):
         _LOGGER.info(pformat(device))
         self._hass = hass
         self._name = device[CONF_NAME]
+        self._device_name = device[CONF_DEVICE_ID]
         self._device_id = _slugify_upper(device[CONF_DEVICE_ID])
         self._attr_unique_id = "unique_id"
 
@@ -258,41 +266,48 @@ class NoiseMusicSystem(MediaPlayerEntity):
         return self._attr_is_volume_muted
 
     # Commands
+    async def publish_command(self, command: str, parameter: str = '') -> None:
+        """Publish a command"""
+        payload = command_payload(command, parameter)
+        command_topic = "noisemusicsystem/% s/command" % (self._device_name)
+
+        await mqtt.async_publish(self.hass, command_topic, json.dumps(vars(payload)))
+
     async def async_media_play(self) -> None:
         """Send play command."""
-        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/play")
+        await self.publish_command('play')
 
     async def async_media_pause(self) -> None:
         """Send pause command."""
-        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/pause")
+        await self.publish_command('pause')
 
     async def async_media_stop(self) -> None:
         """Send stop command."""
-        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/stop")
+        await self.publish_command('stop')
 
     async def async_media_previous_track(self) -> None:
         """Send previous track command."""
-        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/previous", "previous")
+        await self.publish_command('previous')
 
     async def async_media_next_track(self) -> None:
         """Send next track command."""
-        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/next")
+        await self.publish_command('next')
 
     async def async_media_seek(self, position: float) -> None:
         """Send seek command."""
-        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/seek", position)
+        await self.publish_command('seek', position)
 
     async def async_set_repeat(self, repeat: RepeatMode) -> None:
         """Set repeat mode."""
-        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/repeat")
+        await self.publish_command('repeat')
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Set volume level, range 0..1."""
-        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/volume", volume)
+        await self.publish_command('volume', volume)
 
     async def async_mute_volume(self, mute: bool) -> None:
         """Mute the volume."""
-        await mqtt.async_publish(self.hass, "noisemusicsystem/SaltMine/command/volume", 0)
+        await self.publish_command('mute', mute)
 
 
 def _parse_topic(topic: str) -> dict[str, Any]:
