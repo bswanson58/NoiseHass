@@ -129,7 +129,7 @@ async def async_setup_platform(
 
     _LOGGER.info(pformat(config))
 
-    device = {
+    device: PLATFORM_SCHEMA = {
         CONF_NAME: config[CONF_NAME],
         CONF_DEVICE_ID: config[CONF_DEVICE_ID]
     }
@@ -143,9 +143,9 @@ class NoiseMusicSystem(MediaPlayerEntity):
         self._hass = hass
         self._name = device[CONF_NAME]
         self._device_name = device[CONF_DEVICE_ID]
+
         self._device_id = _slugify_upper(device[CONF_DEVICE_ID])
-# TODO: define the unique_id
-        self._attr_unique_id = "unique_id"
+        self._attr_unique_id = device[CONF_DEVICE_ID]
 
         self._attr_media_album_artist = ""
         self._track_artist = ""
