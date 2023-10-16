@@ -162,7 +162,7 @@ class NoiseMusicSystem(MediaPlayerEntity):
         def update_availability(payload: str) -> None:
             """Update device availability"""
             self._attr_available = payload == ONLINE_STATUS
-            self.schedule_update_ha_state(True)
+            self.schedule_update_ha_state(False)
 
         def update_status(payload: str) -> None:
             """Update device state"""
@@ -186,7 +186,7 @@ class NoiseMusicSystem(MediaPlayerEntity):
             if(len(data.get(ATTR_POSITION_AT))):
                 self._attr_media_position_updated_at = dt.datetime.strptime(data.get(ATTR_POSITION_AT), '%a, %d %b %Y %H:%M:%S GMT') #RFC 1123 format
 
-            self.schedule_update_ha_state(True)
+            self.schedule_update_ha_state(False)
 
         @callback
         def message_received(msg):
