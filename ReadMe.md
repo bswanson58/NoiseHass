@@ -12,12 +12,11 @@ noisemusicsystem/{DEVICE ID}/status
 
 noisemusicsystem/{DEVICE ID}/command
 
+The availability topic has a payload of either 'online' or 'offline' in raw format. It must be 'online' before status and command messages are observed by Home Assistant.
 
+The status and command topics have payloads in JSON format:
 
-The availability topic has a payload of either 'online' or 'offline' in raw format.
-
-The status and command topics have payload in JSON format:
-
+```
 {    
 
     "artist": "Artist Name",
@@ -41,6 +40,7 @@ The status and command topics have payload in JSON format:
     "playstate": "playing"
 
 }
+```
 
 'Duration' and 'position' are expressed in seconds.
 
@@ -50,10 +50,9 @@ The status and command topics have payload in JSON format:
 
 'PlayState' is 'playing' or anything else that is interpreted as not playing.
 
-
-
 The command payload is:
 
+```
 {
 
     "command": "play",
@@ -61,8 +60,7 @@ The command payload is:
     "parameter": ""
 
 }
-
-
+```
 
 Valid commands are: 'next', 'mute', 'pause', 'play', 'repeat', 'seek', 'stop', 'previous', 'volume'
 
@@ -74,10 +72,9 @@ Mute has a parameter of 'true' or 'false'.
 
 Repeat will repeat the currently playing track.
 
-
-
 The Home Assistant configuration is:
 
+```
 media_player:
 
   - platform: noise_music_system
@@ -85,8 +82,7 @@ media_player:
     device_id: "NoiseBox"
 
     name: "Noise Music System"
-
-
+```
 
 The integration files should be placed under: config/custom_components/noise_music_system
 
