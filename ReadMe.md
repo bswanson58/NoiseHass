@@ -18,27 +18,16 @@ The status and command topics have payloads in JSON format:
 
 ```
 {    
-
     "artist": "Artist Name",
-
     "album": "Album Title",
-
     "trackname": "Track Title",
-
     "tracknumber": 7,
-
     "duration": 120,
-
     "position": 60,
-
     "positionat":"Wed, 18 Oct 2023 10:41:58 GMT",
-
     "volume": 75,
-
     "muted": false,
-
-    "playstate": "playing"
-
+    "playstate": "playing"
 }
 ```
 
@@ -54,11 +43,8 @@ The command payload is:
 
 ```
 {
-
     "command": "play",
-
     "parameter": ""
-
 }
 ```
 
@@ -76,11 +62,8 @@ The Home Assistant configuration is:
 
 ```
 media_player:
-
   - platform: noise_music_system
-
     device_id: "NoiseBox"
-
     name: "Noise Music System"
 ```
 
