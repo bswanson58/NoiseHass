@@ -1,4 +1,6 @@
 """Platform for Noise Music System integration"""
+# pylint: disable=broad-except
+
 from __future__ import annotations
 
 import datetime as dt
@@ -156,6 +158,7 @@ class NoiseMusicSystem(MediaPlayerEntity):
         self._attr_state = MediaPlayerState.PAUSED
         self._attr_available = False
 
+
     async def async_added_to_hass(self) -> None:
         """Subscribe to MQTT events."""
 
@@ -164,29 +167,39 @@ class NoiseMusicSystem(MediaPlayerEntity):
             self._attr_available = payload == ONLINE_STATUS
             self.schedule_update_ha_state(False)
 
+            _LOGGER.info(f'Device "{self._device_name}" is {"online" if self._attr_available else "offline"}')
+
+
         def update_status(payload: str) -> None:
             """Update device state"""
             try:
                 data = STATUS_PAYLOAD(payload)
             except vol.MultipleInvalid as error:
-                _LOGGER.debug(f'Status update has malformatted data: {error}')
+                _LOGGER.error(f'Status update for "{self._device_name}" has malformatted data: {error}')
                 return
 
-            self._attr_available = True
-            self._track_artist = data.get(ATTR_ARTIST)
-            self._attr_media_album_artist = data.get(ATTR_ARTIST)
-            self._track_album_name = data.get(ATTR_ALBUM)
-            self._track_name = data.get(ATTR_TRACKNAME)
-            self._attr_media_track = data.get(ATTR_TRACK_NUMBER)
-            self._attr_media_duration = data.get(ATTR_DURATION)
-            self._attr_media_position = data.get(ATTR_POSITION)
-            self._volume = data.get(ATTR_VOLUME) / 100.0
-            self._attr_is_volume_muted = data.get(ATTR_VOLUME_MUTED)
-            self._attr_state = MediaPlayerState.PLAYING if data.get(ATTR_PLAY_STATE) == PLAY_STATE_PLAYING else MediaPlayerState.PAUSED
-            if(len(data.get(ATTR_POSITION_AT))):
-                self._attr_media_position_updated_at = dt.datetime.strptime(data.get(ATTR_POSITION_AT), '%a, %d %b %Y %H:%M:%S GMT') #RFC 1123 format
+            try:
+                self._attr_available = True
+                self._track_artist = data.get(ATTR_ARTIST)
+                self._attr_media_album_artist = data.get(ATTR_ARTIST)
+                self._track_album_name = data.get(ATTR_ALBUM)
+                self._track_name = data.get(ATTR_TRACKNAME)
+                self._attr_media_track = data.get(ATTR_TRACK_NUMBER)
+                self._attr_media_duration = data.get(ATTR_DURATION)
+                self._attr_media_position = data.get(ATTR_POSITION)
+                self._volume = data.get(ATTR_VOLUME) / 100.0
+                self._attr_is_volume_muted = data.get(ATTR_VOLUME_MUTED)
+                self._attr_state = MediaPlayerState.PLAYING if data.get(ATTR_PLAY_STATE) == PLAY_STATE_PLAYING else MediaPlayerState.PAUSED
+                if(len(data.get(ATTR_POSITION_AT))):
+                    self._attr_media_position_updated_at = dt.datetime.strptime(data.get(ATTR_POSITION_AT), '%a, %d %b %Y %H:%M:%S GMT') #RFC 1123 format
+
+                _LOGGER.debug(f'Status update for "{self._device_name}": {data}')
+            except Exception as error:
+                _LOGGER.error(f'Status update for "{self._device_name}" failed: {error}')
+                return
 
             self.schedule_update_ha_state(False)
+
 
         @callback
         def message_received(msg):
@@ -200,9 +213,10 @@ class NoiseMusicSystem(MediaPlayerEntity):
                             update_availability(msg.payload)
                         case 'status':
                             update_status(msg.payload)
-
-            except vol.MultipleInvalid as error:
-                _LOGGER.debug(f'Received message has malformatted data: {error}')
+                        case _:
+                            _LOGGER.debug(f'Unknown topic: {msg.topic}')
+            except Exception as error:
+                _LOGGER.error(f'Received message has malformatted data: {error}')
                 return
 
         await mqtt.async_subscribe(self.hass, SUBSCRIBE_TOPIC, message_received, 1)
