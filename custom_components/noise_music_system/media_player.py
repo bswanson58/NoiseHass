@@ -15,7 +15,7 @@ from homeassistant.components import mqtt
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 import homeassistant.helpers.config_validation as cv
-from homeassistant.util import dt as dt_util, slugify
+from homeassistant.util import slugify
 from homeassistant.util.json import json_loads
 
 from homeassistant.components.media_player.const import MediaPlayerEntityFeature
@@ -30,7 +30,6 @@ from homeassistant.components.media_player import (
 from homeassistant.const import (
     ATTR_DEVICE_ID,
     ATTR_COMMAND,
-    ATTR_ID,
     CONF_DEVICE_ID,
     CONF_NAME
 )
