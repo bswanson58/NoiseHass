@@ -1,0 +1,6 @@
+{
+  "name": "Noise Music System",
+  "content_in_root": false,
+  "homeassistant": "0.99.9",
+  "hacs": "0.19.0"
+}
