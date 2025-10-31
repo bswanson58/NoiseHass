@@ -4,6 +4,21 @@ An integration for Home Assistant to support a media player entity using MQTT as
 
 ---
 
+Installation:
+Add this repository to HACS (https://github.com/bswanson58/NoiseHass)
+and then add the 'Noise Music System' integration through HACS
+
+Add a media player in configuration.yaml:
+
+```
+media_player:
+  - platform: noise_music_system
+    device_id: "something unique"
+    name: "Noise Music System"
+```
+
+---
+
 The integration communicates through a series of MQTT topics:
 
 noisemusicsystem/{DEVICE ID}/availability
